@@ -12,18 +12,21 @@ class UserController extends Controller
    public function apiIndex() {
         return User::with('role')->get()
             ->map(fn($u)=>[
-                'id'=>$u->id,
-                'name'=>$u->name,
-                'email'=>$u->email,
-                'role'=>$u->role->name
+                'id'       => $u->id,
+                'name'     => $u->name,
+                'email'    => $u->email,
+                'role_id'  => $u->role_id,
+                'role'     => $u->role->name
             ]);
     }
+
     public function index()
     {
         return view('users');
     }
-    public Function RolesData() {
-        return Role::all();
+    public function RolesData(Request $request)
+    {
+        return response()->json(Role::all());
     }
     public function store(Request $r)
     {

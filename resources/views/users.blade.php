@@ -6,7 +6,7 @@
 
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <!-- Bootstrap 4 -->
+    <!-- Bootstrap -->
     <link rel="stylesheet"
           href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 
@@ -23,46 +23,60 @@
 
 <div class="container mt-5">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>👤 Manajemen User</h2>
+        <h2>Manajemen User</h2>
         <button class="btn btn-success btn-sm" @click="addUser">
-            ➕ Tambah User
+            Tambah User
         </button>
     </div>
 
     <div class="card">
         <div class="card-body p-0">
-            <table class="table table-bordered table-striped mb-0">
-                <thead class="thead-dark">
-                <tr>
-                    <th>Nama</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th width="120" class="text-center">Aksi</th>
-                </tr>
-                </thead>
-                <tbody>
-                <template x-for="u in users" :key="u.id">
+
+            <!-- loading indicator -->
+            <div class="p-4 text-center" x-show="loading">
+                Loading...
+            </div>
+
+            <!-- table -->
+            <template x-if="!loading">
+                <table class="table table-bordered table-striped mb-0">
+                    <thead class="thead-dark">
                     <tr>
-                        <td x-text="u.name"></td>
-                        <td x-text="u.email"></td>
-                        <td>
+                        <th>Nama</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th width="120" class="text-center">Aksi</th>
+                    </tr>
+                    </thead>
+
+                    <tbody>
+                    <template x-for="u in users" :key="u.id + '-' + u.role_id">
+                        <tr>
+                            <td x-text="`${u.name} - ${roleName(u.role_id)}`"></td>
+                            <td x-text="u.email"></td>
+                            <td>
                             <select class="form-control form-control-sm"
-                                    x-model="u.role_id">
+                                    x-model.number="u.role_id">
                                 <template x-for="r in roles" :key="r.id">
-                                    <option :value="r.id" x-text="r.name"></option>
+                                    <option
+                                        :value="Number(r.id)"
+                                        :selected="Number(r.id) === Number(u.role_id)"
+                                        x-text="r.name">
+                                    </option>
                                 </template>
                             </select>
-                        </td>
-                        <td class="text-center">
-                            <button class="btn btn-sm btn-primary"
-                                    @click="saveRole(u)">
-                                Simpan
-                            </button>
-                        </td>
-                    </tr>
-                </template>
-                </tbody>
-            </table>
+                            </td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-primary"
+                                        @click="saveRole(u)">
+                                    Simpan
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                    </tbody>
+                </table>
+            </template>
         </div>
     </div>
 </div>
@@ -72,20 +86,35 @@ function userStore() {
     return {
         users: [],
         roles: [],
+        loading: true,
         csrf: document.querySelector('meta[name="csrf-token"]').content,
 
-        /* ===== LOAD ALL ===== */
+        /* ===== LOAD ALL (AMAN) ===== */
         async load() {
-            await this.loadRoles();
-            const r = await fetch('/api/users');
-            this.users = await r.json();
-        },
+            try {
+                this.loading = true;
 
-        async loadRoles() {
-            const r = await fetch('/api/roles');
-            this.roles = await r.json();
-        },
+                const rr = await fetch('/api/roles');
+                this.roles = rr.ok ? await rr.json() : [];
 
+                const ru = await fetch('/api/users');
+                const users = await ru.json();
+
+                this.users = users.map(u => ({
+                    ...u,
+                    role_id: Number(u.role_id)
+                }));
+
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.loading = false;
+            }
+        },
+        roleName(role_id) {
+            const r = this.roles.find(r => Number(r.id) === Number(role_id));
+            return r ? r.name : '-';
+        },
         /* ===== UPDATE ROLE ===== */
         async saveRole(user) {
             const r = await fetch(`/api/users/${user.id}/change-role`, {
@@ -105,70 +134,49 @@ function userStore() {
             Swal.fire({
                 icon: 'success',
                 title: 'Berhasil',
-                text: 'Role user diperbarui',
-                timer: 1200,
+                timer: 900,
                 showConfirmButton: false
             });
         },
 
         /* ===== ADD USER ===== */
         async addUser() {
-            const roleOptions = this.roles.map(r =>
-                `<option value="${r.id}">${r.name}</option>`
-            ).join('');
+            const roleOptions = this.roles
+                .map(r => `<option value="${r.id}">${r.name}</option>`)
+                .join('');
 
             const { value: form } = await Swal.fire({
                 title: 'Tambah User',
                 html: `
-                    <div class="text-left">
-                        <div class="form-group">
-                            <label>Nama</label>
-                            <input id="u-name" class="form-control" placeholder="Nama">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Email</label>
-                            <input id="u-email" class="form-control" placeholder="Email">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Password</label>
-                            <input id="u-password" type="password" class="form-control" placeholder="Password">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Role</label>
-                            <select id="u-role" class="form-control">
-                                ${roleOptions}
-                            </select>
-                        </div>
-                    </div>
-
+                    <input id="u-name" class="form-control mb-2" placeholder="Nama">
+                    <input id="u-email" class="form-control mb-2" placeholder="Email">
+                    <input id="u-password" type="password" class="form-control mb-2" placeholder="Password">
+                    <select id="u-role" class="form-control">
+                        ${roleOptions}
+                    </select>
                 `,
                 showCancelButton: true,
                 confirmButtonText: 'Simpan',
-                focusConfirm: false,
                 preConfirm: () => {
-                    const name = document.getElementById('u-name').value;
-                    const email = document.getElementById('u-email').value;
-                    const password = document.getElementById('u-password').value;
-                    const role_id = parseInt(document.getElementById('u-role').value);
+                    const name = u('u-name').value.trim();
+                    const email = u('u-email').value.trim();
+                    const password = u('u-password').value;
+                    const role_id = parseInt(u('u-role').value);
+
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
                     if (!name || !email || !password) {
                         Swal.showValidationMessage('Semua field wajib diisi');
                         return;
                     }
 
-                    // Validasi email
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                     if (!emailRegex.test(email)) {
-                        Swal.showValidationMessage('Email tidak valid');
+                        Swal.showValidationMessage('Format email tidak valid');
                         return;
                     }
 
-                    // Validasi password minimal 8 karakter
                     if (password.length < 8) {
-                        Swal.showValidationMessage('Password harus minimal 8 karakter');
+                        Swal.showValidationMessage('Password minimal 8 karakter');
                         return;
                     }
 
@@ -179,7 +187,7 @@ function userStore() {
 
             if (!form) return;
 
-            const r = await fetch('/api/users', {
+            await fetch('/api/users', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -188,22 +196,14 @@ function userStore() {
                 body: JSON.stringify(form)
             });
 
-            if (!r.ok) {
-                Swal.fire('Gagal', 'User gagal ditambahkan', 'error');
-                return;
-            }
-
-            Swal.fire({
-                icon: 'success',
-                title: 'Berhasil',
-                text: 'User berhasil ditambahkan',
-                timer: 1200,
-                showConfirmButton: false
-            });
-
-            this.load();
+            await this.load();
         }
     }
+    
+}
+
+function u(id) {
+    return document.getElementById(id);
 }
 </script>
 

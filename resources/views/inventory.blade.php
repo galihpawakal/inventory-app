@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Inventaris</title>
+    <title>Inventory</title>
 
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
@@ -12,7 +12,7 @@
 <body class="bg-light">
 
 <div class="container mt-5">
-    <h2 class="mb-4">📦 Inventaris Produk</h2>
+    <h2 class="mb-4">Inventory Produk</h2>
 
     <div class="card mb-4">
         <div class="card-body">
@@ -57,22 +57,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* ===== LOAD DATA ===== */
     async function load() {
-        const r = await fetch('/api/products');
-        const d = await r.json();
+        try {
+            const r = await fetch('/api/products');
+            const d = await r.json();
 
-        tbl.innerHTML = d.map(p => `
-            <tr>
-                <td>${p.name}</td>
-                <td>Rp ${Number(p.price).toLocaleString()}</td>
-                <td>${p.stock}</td>
-                <td>
-                    <button class="btn btn-sm btn-danger"
-                            onclick="sell(${p.id}, ${p.stock})">
-                        Jual
-                    </button>
-                </td>
-            </tr>
-        `).join('');
+            const products = d.filter(p => Number(p.stock || 0) > 0);
+
+            if (products.length === 0) {
+                tbl.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">
+                            Tidak ada produk tersedia
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbl.innerHTML = products.map(p => `
+                <tr>
+                    <td>${p.name}</td>
+                    <td>Rp ${Number(p.price).toLocaleString()}</td>
+                    <td>${p.stock}</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger"
+                                onclick="sell(${p.id}, ${p.stock})">
+                            Jual
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+        } catch (e) {
+            console.error(e);
+            Swal.fire('Error', 'Gagal memuat data', 'error');
+        }
     }
 
     /* ===== ADD PRODUCT ===== */
